@@ -499,7 +499,7 @@ def combine_data(location, start_date=None, end_date=None, row_time_int=5):
     # this makes the code flexible for use on Linux and Windows machines 
     # (which require path in a different format)
 
-    # in the future you can likely use os.path.join instead of this clever trick :)
+    # in the future you can likely use os.path.join instead of this clever trick aka brute force :)
     system = platform.system()
     if system == "Linux":
         path_slash = '/'
@@ -678,11 +678,14 @@ def combine_data(location, start_date=None, end_date=None, row_time_int=5):
     # SUN AND MOON DATA ----------------------------------------------------------------------------------------------------------------------------
     # Read in moon and sun data for this location
 
-    moon_data_path = f"Moon_Data{path_slash}" + location + "_Moon_Phase.dat"
+    # in the future, try to switch this to use os.path.join instead of using path_slash to brute force handle paths in windows vs linux 
+    # moon_data_path = f"Moon_Data{path_slash}" + location + "_Moon_Phase.dat"
+    moon_data_path = os.path.join("Moon_Data", f"{location}_Moon_Phase.dat")
     with open(moon_data_path, 'r') as moon_file:
         moon_data = moon_file.readlines()
 
-    sun_data_path = f"Sun_Data{path_slash}" + location + "_Twilight.dat"
+    # sun_data_path = f"Sun_Data{path_slash}" + location + "_Twilight.dat"
+    sun_data_path = os.path.join("Sun_Data", f"{location}_Twilight.dat")
     with open(sun_data_path, 'r') as sun_file:
         sun_data = sun_file.readlines()
 
@@ -704,8 +707,11 @@ def combine_data(location, start_date=None, end_date=None, row_time_int=5):
     # Loop through each night for the location
     for night_date in tqdm(nights_list, desc="Processing nights"):
         # Construct paths for SQM and weather data
-        sqm_path = loc_dict.get(location)[2] + path_slash + loc_dict.get(location)[2] + night_date + ".txt"
-        weather_path = f"Daily_Weather_Data{path_slash}" + loc_dict.get(location)[1] + path_slash + loc_dict.get(location)[1] + night_date + ".txt"
+        # old way: uses path_slash ---> new way using os.path.join
+        # sqm_path = loc_dict.get(location)[2] + path_slash + loc_dict.get(location)[2] + night_date + ".txt"
+        sqm_path = os.path.join(loc_dict.get(location)[2], f"{loc_dict.get(location)[2]}{night_date}.txt")
+        # weather_path = f"Daily_Weather_Data{path_slash}" + loc_dict.get(location)[1] + path_slash + loc_dict.get(location)[1] + night_date + ".txt"
+        weather_path = os.path.join("Daily_Weather_Data", loc_dict.get(location)[1], f"{loc_dict.get(location)[1]}{night_date}.txt" )
 
         # # checkpoint
         # print(weather_path)
@@ -769,14 +775,15 @@ def combine_data(location, start_date=None, end_date=None, row_time_int=5):
             df = populate_weather_vals(night_date, df, weather_data)
     
 
-    # save dataframe to the desired path 
+    # save dataframe to the desired path old way
     save_dir = 'Combined Data Tables'
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
+    # if not os.path.exists(save_dir):
+    #     os.makedirs(save_dir)
+
+    os.makedirs(save_dir, exist_ok=True) # make directory if it doesn't already exist
 
     save_path = os.path.join(save_dir, f'{location.replace(" ", "_")}_data_{start_datetime.strftime("%Y-%m-%d")}_{end_datetime.strftime("%Y-%m-%d")}.csv')
     df.to_csv(save_path, index=False, mode='w')
-
 
 
     return df
@@ -957,123 +964,7 @@ def make_hist(df, location, classification, high_confidence, row_or_night):
     plt.close()
     # plt.clf()
 
-
-
-# # Make Stacked Histogram
-# def make_stacked_hist(df, location, high_confidence, row_or_night, save_fig=True):
-
-#     """ 
-#     ARGS:
-#         - df: pandas dataframe
-#         - classification: str - "Clear" or "Overcast" 
-#         - high_confidence: bool - True for strict classifications, False for less strict classifications
-#     """
-
-#     # read in the the dates
-#     start_date_str = df.at[0, "Night Date"]
-#     last_row_index = df.index[-1]
-#     end_date_str = df.at[last_row_index, "Night Date"]
-
-#     # row or night
-#     if row_or_night == "Row":
-#         row_or_night_str = "Measurements"
-#     elif row_or_night == "Night":
-#         row_or_night_str = "Nights"
-    
-#     # filter the df based on the classification and confidence conditions
-
-#     # if the row_or_night is night, then only look at the unique nights
-#     if row_or_night == "Night":
-        
-#         df = df[df["Sun Up"]==False] # make sure we only look at the night (classifications are stored only for night)
-#         df = df.drop_duplicates(subset='Night Date', keep='first')
-
-#         bin_width = 0.5 # bigger bin width because there's less data
-
-#     else: 
-#         bin_width = 0.1 # smaller bin width for lots of measurements 
-
-#     # if high_confidence is True, only pick out rows where Row Classification Confidence is True
-#     # otherwise, we don't care what the confidence is
-
-#     if high_confidence == True:
-#         clear_df = df[(df["Row Classification"] == "Clear") & df[f"{row_or_night} Classification Confidence"] == high_confidence]
-#         overcast_df = df[(df["Row Classification"] == "Overcast") & df[f"{row_or_night} Classification Confidence"] == high_confidence]
-    
-#     elif high_confidence == False:
-#         clear_df = df[(df["Row Classification"] == "Clear")]
-#         overcast_df = df[(df["Row Classification"] == "Overcast")]
-
-#     clear_sqms = clear_df["SQM"].dropna().to_list()
-#     num_clear_sqms = len(clear_sqms)
-
-#     overcast_sqms = overcast_df["SQM"].dropna().to_list()
-#     num_overcast_sqms = len(overcast_sqms)
-
-#     if high_confidence == True:
-#         conf_str = "Strict Classifications"
-
-#     elif high_confidence != True:
-#         conf_str = "Lenient Classifications"
-
-        
-#     # now, find averages
-#     clear_sqm_avg = np.mean(clear_sqms)
-#     overcast_sqm_avg = np.mean(overcast_sqms)
-
-#     # Calculate the difference
-#     difference = clear_sqm_avg - overcast_sqm_avg
-
-
-#     # now, plot the histogram
-#     bins = np.arange(11.95, 22.05, bin_width)
-#     plt.figure()
-#     _, _, patches = plt.hist([overcast_sqms, clear_sqms],bins, histtype = 'stepfilled', alpha = 0.6, color=["green", "black"], label=["Overcast", "Clear"])
-
-
-#     # Plot the mean sky brightness as a grey dotted line
-#     plt.axvline(x=clear_sqm_avg, color='black', linestyle='dotted', linewidth=1.5, label=f'Mean (Clear): {clear_sqm_avg:.2f} mag/arcsec$^2$')
-#     plt.axvline(x=overcast_sqm_avg, color='green', linestyle='dotted', linewidth=1.5, label=f'Mean (Overcast): {overcast_sqm_avg:.2f} mag/arcsec$^2$')
-
-
-#      # Add legend
-
-#      # Extract the legend handles for Clear and Overcast histograms
-#     clear_patch = plt.Rectangle((0, 0), 1, 1, fc="black", edgecolor = 'black', alpha=0.6, label="Clear")
-#     overcast_patch = plt.Rectangle((0, 0), 1, 1, fc="green", edgecolor = 'green', alpha=0.6, label="Overcast")
-
-    
-#     legend_entry_diff = f'Difference: {difference:.2f}'
-#     plt.legend(handles=[clear_patch,
-#                         overcast_patch,
-#                         plt.Line2D([0], [0], color='black', linestyle='dotted', label=f'Clear Average: {clear_sqm_avg:.2f}'),
-#                         plt.Line2D([0], [0], color='green', linestyle='dotted', label=f'Overcast Average: {overcast_sqm_avg:.2f}'),
-#                         plt.Line2D([0], [0], alpha=0, label=legend_entry_diff)
-#                         ])
-
-#     # Title
-#     title = f"{location.replace('_', ' ')}: {start_date_str.replace('-', '/')} - {end_date_str.replace('-', '/')}"
-#     plt.title(title, fontsize=16, loc='center', pad=20)
-
-#     # Subtitle
-#     subtitle = f"{num_clear_sqms} Clear & {num_overcast_sqms} Overcast {row_or_night_str} -- {conf_str}"
-#     plt.text(0.5, 1.03, subtitle, ha='center', va='center', fontsize=10, transform=plt.gca().transAxes)
-
-
-#     plt.xlabel(r'Sky Brightness [mag/arcsec$^2$]', fontsize=12, ha='center', labelpad=0)
-#     plt.minorticks_on()
-#     plt.grid()
-    
-#     if save_fig:
-#         plt_save_path = os.path.join("histograms", "stacked histograms", f"{location.replace(' ', '_')}_stacked-hist_{start_date_str}_{end_date_str}_{row_or_night_str}_{conf_str.replace(' ', '_')}")
-#         plt.savefig(plt_save_path)
-#         # plt.clf()
-
-
-
-# 
-
-
+# make stacked histograms 
 def make_stacked_hist(df, location, high_confidence, row_or_night, ax=None, save_fig=True):
     """ 
     ARGS:
@@ -1173,7 +1064,7 @@ def make_stacked_hist(df, location, high_confidence, row_or_night, ax=None, save
     
     if save_fig:
         plt_save_path = os.path.join("histograms", "stacked histograms", f"{location.replace(' ', '_')}_stacked-hist_{start_date_str}_{end_date_str}_{row_or_night_str}_{conf_str.replace(' ', '_')}")
-        os.makedirs(os.path.dirname(plt_save_path), exist_ok=True)
+        os.makedirs(os.path.dirname(plt_save_path), exist_ok=True) # make directory if it doesn't already exist
         plt.savefig(plt_save_path)
         plt.close()
         # plt.clf()  # Uncomment if you want to clear the figure after saving
